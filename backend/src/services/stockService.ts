@@ -1,5 +1,9 @@
 import axios from 'axios';
+import dotenv from 'dotenv';
 import { StockQuote, MarketIndex, ChartDataPoint, StockNews, CompanyProfile, AnalystRecommendation, PriceTarget } from '../types';
+
+// Load environment variables before instantiation
+dotenv.config();
 
 class StockService {
   private alphaVantageKey: string;
@@ -8,6 +12,13 @@ class StockService {
   constructor() {
     this.alphaVantageKey = process.env.ALPHA_VANTAGE_API_KEY || '';
     this.finnhubKey = process.env.FINNHUB_API_KEY || '';
+    
+    // Log API key status for debugging
+    console.log('StockService initialized with:', {
+      hasAlphaVantageKey: !!this.alphaVantageKey,
+      hasFinnhubKey: !!this.finnhubKey,
+      finnhubKeyPreview: this.finnhubKey ? `${this.finnhubKey.slice(0, 8)}...` : 'none'
+    });
   }
 
   // Mock data for development/demo
@@ -249,8 +260,16 @@ class StockService {
     }
   }
 
-  // Lấy chỉ số thị trường chính
-  async getMarketIndices(): Promise<MarketIndex[]> {
+  // Mock market indices data (Finnhub free plan doesn't support indices)
+  private getMockMarketIndices(): MarketIndex[] {
+    const baseValues = {
+      '^GSPC': 5200,
+      '^DJI': 38500,
+      '^IXIC': 16200,
+      '^FTSE': 7800,
+      '^N225': 38000
+    };
+
     const indices = [
       { symbol: '^GSPC', name: 'S&P 500' },
       { symbol: '^DJI', name: 'Dow Jones' },
@@ -259,23 +278,27 @@ class StockService {
       { symbol: '^N225', name: 'Nikkei 225' }
     ];
 
-    const results = await Promise.all(
-      indices.map(async (index) => {
-        const quote = await this.getStockQuote(index.symbol);
-        if (!quote) return null;
+    return indices.map(index => {
+      const baseValue = baseValues[index.symbol as keyof typeof baseValues];
+      const change = (Math.random() - 0.5) * 100;
+      const changePercent = (change / baseValue) * 100;
 
-        return {
-          symbol: index.symbol,
-          name: index.name,
-          value: quote.price,
-          change: quote.change,
-          changePercent: quote.changePercent,
-          timestamp: quote.timestamp
-        };
-      })
-    );
+      return {
+        symbol: index.symbol,
+        name: index.name,
+        value: parseFloat((baseValue + change).toFixed(2)),
+        change: parseFloat(change.toFixed(2)),
+        changePercent: parseFloat(changePercent.toFixed(2)),
+        timestamp: Date.now()
+      };
+    });
+  }
 
-    return results.filter((r): r is MarketIndex => r !== null);
+  // Lấy chỉ số thị trường chính
+  async getMarketIndices(): Promise<MarketIndex[]> {
+    // Note: Finnhub free plan requires subscription for market indices
+    // Using mock data for demonstration
+    return this.getMockMarketIndices();
   }
 
   // Mock search results

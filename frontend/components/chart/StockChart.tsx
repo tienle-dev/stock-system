@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createChart, IChartApi, CandlestickData } from 'lightweight-charts';
 import { ChartDataPoint } from '@/types';
 
@@ -13,6 +13,8 @@ export default function StockChart({ data, symbol }: StockChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<any>(null);
+  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -85,14 +87,29 @@ export default function StockChart({ data, symbol }: StockChartProps) {
       if (chartRef.current) {
         chartRef.current.timeScale().fitContent();
       }
+
+      // Update timestamp and show indicator
+      setLastUpdate(Date.now());
+      setIsUpdating(true);
+      setTimeout(() => setIsUpdating(false), 500);
     }
   }, [data]);
 
   return (
     <div className="bg-white rounded-lg border shadow-sm p-6">
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-900">{symbol} Price Chart</h2>
-        <p className="text-sm text-gray-600">Candlestick chart showing historical price data</p>
+      <div className="mb-4 flex justify-between items-start">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">{symbol} Price Chart</h2>
+          <p className="text-sm text-gray-600">Candlestick chart showing historical price data</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isUpdating && (
+            <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+          )}
+          <span className="text-xs text-gray-500">
+            Auto-refresh: 2 min • Last: {new Date(lastUpdate).toLocaleTimeString()}
+          </span>
+        </div>
       </div>
       
       <div ref={chartContainerRef} className="w-full" />

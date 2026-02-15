@@ -100,7 +100,7 @@ export interface Watchlist {
 }
 
 export interface WSMessage {
-  type: 'subscribe' | 'unsubscribe' | 'subscribed' | 'unsubscribed' | 'price_update' | 'error' | 'connected';
+  type: 'subscribe' | 'unsubscribe' | 'subscribed' | 'unsubscribed' | 'price_update' | 'indices_update' | 'error' | 'connected';
   data: any;
   timestamp: number;
 }

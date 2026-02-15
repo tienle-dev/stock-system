@@ -10,9 +10,20 @@ interface StockCardProps {
 
 export default function StockCard({ quote, liveUpdate }: StockCardProps) {
   const [displayQuote, setDisplayQuote] = useState(quote);
+  const [priceFlash, setPriceFlash] = useState<'up' | 'down' | null>(null);
 
   useEffect(() => {
     if (liveUpdate) {
+      // Determine if price went up or down
+      const previousPrice = displayQuote.price;
+      const newPrice = liveUpdate.price;
+      
+      if (newPrice > previousPrice) {
+        setPriceFlash('up');
+      } else if (newPrice < previousPrice) {
+        setPriceFlash('down');
+      }
+      
       setDisplayQuote(prev => ({
         ...prev,
         price: liveUpdate.price,
@@ -20,12 +31,22 @@ export default function StockCard({ quote, liveUpdate }: StockCardProps) {
         changePercent: liveUpdate.changePercent,
         timestamp: liveUpdate.timestamp
       }));
+      
+      // Clear flash after animation
+      setTimeout(() => setPriceFlash(null), 500);
     }
   }, [liveUpdate]);
 
   const isPositive = displayQuote.change >= 0;
   const changeColor = isPositive ? 'text-green-600' : 'text-red-600';
   const bgColor = isPositive ? 'bg-green-50' : 'bg-red-50';
+  
+  // Flash animation classes
+  const flashClass = priceFlash === 'up' 
+    ? 'animate-flash-green' 
+    : priceFlash === 'down' 
+    ? 'animate-flash-red' 
+    : '';
 
   return (
     <div className={`rounded-lg border p-6 shadow-sm hover:shadow-md transition-shadow ${bgColor}`}>
@@ -36,7 +57,7 @@ export default function StockCard({ quote, liveUpdate }: StockCardProps) {
           <p className="text-xs text-gray-500">{displayQuote.exchange}</p>
         </div>
         <div className="text-right">
-          <p className="text-3xl font-bold text-gray-900">
+          <p className={`text-3xl font-bold text-gray-900 transition-all ${flashClass}`}>
             ${displayQuote.price.toFixed(2)}
           </p>
           <p className={`text-sm font-semibold ${changeColor}`}>

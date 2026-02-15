@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { WSPriceUpdate } from '@/types';
+import { WSPriceUpdate, MarketIndex } from '@/types';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002';
 const MAX_RETRY_ATTEMPTS = 3; // Giới hạn số lần retry
@@ -7,6 +7,7 @@ const MAX_RETRY_ATTEMPTS = 3; // Giới hạn số lần retry
 interface UseWebSocketReturn {
   connected: boolean;
   priceUpdates: Map<string, WSPriceUpdate>;
+  indicesUpdates: MarketIndex[];
   subscribe: (symbols: string[]) => void;
   unsubscribe: (symbols: string[]) => void;
 }
@@ -15,6 +16,7 @@ export function useWebSocket(): UseWebSocketReturn {
   const ws = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [priceUpdates, setPriceUpdates] = useState<Map<string, WSPriceUpdate>>(new Map());
+  const [indicesUpdates, setIndicesUpdates] = useState<MarketIndex[]>([]);
   const reconnectTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
   const retryCount = useRef<number>(0);
 
@@ -38,6 +40,8 @@ export function useWebSocket(): UseWebSocketReturn {
               newMap.set(message.data.symbol, message.data);
               return newMap;
             });
+          } else if (message.type === 'indices_update') {
+            setIndicesUpdates(message.data);
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
@@ -105,6 +109,7 @@ export function useWebSocket(): UseWebSocketReturn {
   return {
     connected,
     priceUpdates,
+    indicesUpdates,
     subscribe,
     unsubscribe
   };

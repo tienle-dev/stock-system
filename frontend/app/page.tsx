@@ -24,12 +24,65 @@ export default function Home() {
   const [selectedChartSymbol, setSelectedChartSymbol] = useState('AAPL');
   const [loading, setLoading] = useState(true);
 
-  const { connected, priceUpdates, subscribe } = useWebSocket();
+  const { connected, priceUpdates, indicesUpdates, subscribe } = useWebSocket();
+
+  // Update indices when WebSocket sends updates
+  useEffect(() => {
+    if (indicesUpdates.length > 0) {
+      setIndices(indicesUpdates);
+    }
+  }, [indicesUpdates]);
 
   // Load initial data
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  // Auto-refresh market indices every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const indicesData = await stockAPI.getMarketIndices();
+        setIndices(indicesData);
+      } catch (error) {
+        console.error('Error refreshing market indices:', error);
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Auto-refresh news every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (selectedChartSymbol) {
+        try {
+          const newsData = await stockAPI.getNews(selectedChartSymbol);
+          setNews(newsData);
+        } catch (error) {
+          console.error('Error refreshing news:', error);
+        }
+      }
+    }, 300000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [selectedChartSymbol]);
+
+  // Auto-refresh chart data every 2 minutes
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (selectedChartSymbol) {
+        try {
+          const data = await stockAPI.getChartData(selectedChartSymbol);
+          setChartData(data);
+        } catch (error) {
+          console.error('Error refreshing chart data:', error);
+        }
+      }
+    }, 120000); // 2 minutes
+
+    return () => clearInterval(interval);
+  }, [selectedChartSymbol]);
 
   // Subscribe to WebSocket updates
   useEffect(() => {
@@ -171,9 +224,9 @@ export default function Home() {
               <p className="text-gray-600">Real-time tracking of international stock exchanges</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`inline-block w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+              <span className={`inline-block w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
               <span className="text-sm text-gray-600">
-                {connected ? 'Live' : 'Disconnected'}
+                {connected ? 'Live Updates Active' : 'Disconnected'}
               </span>
             </div>
           </div>

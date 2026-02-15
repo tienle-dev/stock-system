@@ -6,6 +6,8 @@ class WebSocketServer {
   private wss: WebSocket.Server | null = null;
   private subscribers: Map<string, Set<WebSocket>> = new Map();
   private updateInterval: NodeJS.Timeout | null = null;
+  private priceCache: Map<string, { price: number; timestamp: number }> = new Map();
+  private indicesUpdateInterval: NodeJS.Timeout | null = null;
 
   init(port: number) {
     this.wss = new WebSocket.Server({ port });
@@ -48,6 +50,7 @@ class WebSocketServer {
 
     // Bắt đầu cập nhật giá định kỳ
     this.startPriceUpdates();
+    this.startIndicesUpdates();
   }
 
   private handleMessage(ws: WebSocket, message: WSMessage) {
@@ -89,6 +92,8 @@ class WebSocketServer {
       this.subscribers.get(symbol)?.delete(ws);
       if (this.subscribers.get(symbol)?.size === 0) {
         this.subscribers.delete(symbol);
+        // Clear cache khi không còn ai subscribe
+        this.priceCache.delete(symbol);
       }
     });
 
@@ -130,34 +135,92 @@ class WebSocketServer {
   }
 
   private async startPriceUpdates() {
-    // Cập nhật giá mỗi 5 giây
+    // Cập nhật giá mỗi 3 giây để tạo cảm giác real-time
     this.updateInterval = setInterval(async () => {
       const symbols = Array.from(this.subscribers.keys());
       
       if (symbols.length === 0) return;
 
-      // Lấy giá mới cho tất cả symbols đang được subscribe
+      // Lấy hoặc simulate giá mới cho tất cả symbols đang được subscribe
       for (const symbol of symbols) {
         try {
-          const quote = await stockService.getStockQuote(symbol);
-          if (quote) {
-            this.broadcast(symbol, {
-              price: quote.price,
-              change: quote.change,
-              changePercent: quote.changePercent,
-              timestamp: quote.timestamp
-            });
+          let price: number;
+          let change: number;
+          let changePercent: number;
+          
+          const cached = this.priceCache.get(symbol);
+          const now = Date.now();
+          
+          // Nếu chưa có cache hoặc cache đã cũ (> 5 phút), fetch từ API
+          if (!cached || (now - cached.timestamp) > 300000) {
+            const quote = await stockService.getStockQuote(symbol);
+            if (!quote) continue;
+            
+            price = quote.price;
+            change = quote.change;
+            changePercent = quote.changePercent;
+            
+            this.priceCache.set(symbol, { price, timestamp: now });
+          } else {
+            // Simulate real-time price movement (±0.1% to ±0.5%)
+            const previousPrice = cached.price;
+            const randomChange = (Math.random() - 0.5) * 2; // -1 to +1
+            const priceChange = previousPrice * (randomChange * 0.005); // ±0.5%
+            
+            price = parseFloat((previousPrice + priceChange).toFixed(2));
+            change = parseFloat(priceChange.toFixed(2));
+            changePercent = parseFloat(((priceChange / previousPrice) * 100).toFixed(2));
+            
+            // Update cache với giá mới
+            this.priceCache.set(symbol, { price, timestamp: now });
           }
+          
+          this.broadcast(symbol, {
+            price,
+            change,
+            changePercent,
+            timestamp: now
+          });
         } catch (error) {
           console.error(`Error updating price for ${symbol}:`, error);
         }
       }
-    }, 5000);
+    }, 3000); // Update every 3 seconds
+  }
+
+  private broadcastToAll(message: WSMessage) {
+    if (!this.wss) return;
+    
+    this.wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(message));
+      }
+    });
+  }
+
+  private async startIndicesUpdates() {
+    // Cập nhật market indices mỗi 30 giây
+    this.indicesUpdateInterval = setInterval(async () => {
+      try {
+        const indices = await stockService.getMarketIndices();
+        
+        this.broadcastToAll({
+          type: 'indices_update',
+          data: indices,
+          timestamp: Date.now()
+        });
+      } catch (error) {
+        console.error('Error updating market indices:', error);
+      }
+    }, 10000); // Update every 10 seconds
   }
 
   stop() {
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
+    }
+    if (this.indicesUpdateInterval) {
+      clearInterval(this.indicesUpdateInterval);
     }
     if (this.wss) {
       this.wss.close();

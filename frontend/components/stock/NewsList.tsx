@@ -1,6 +1,7 @@
 'use client';
 
 import { StockNews } from '@/types';
+import { useState, useEffect } from 'react';
 
 interface NewsListProps {
   news: StockNews[];
@@ -8,6 +9,17 @@ interface NewsListProps {
 }
 
 export default function NewsList({ news, symbol }: NewsListProps) {
+  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  useEffect(() => {
+    if (news.length > 0) {
+      setLastUpdate(Date.now());
+      setIsUpdating(true);
+      setTimeout(() => setIsUpdating(false), 500);
+    }
+  }, [news]);
+
   if (news.length === 0) {
     return (
       <div className="bg-white rounded-lg border shadow-sm p-6">
@@ -19,7 +31,17 @@ export default function NewsList({ news, symbol }: NewsListProps) {
 
   return (
     <div className="bg-white rounded-lg border shadow-sm p-6">
-      <h2 className="text-xl font-bold mb-4 text-gray-900">Latest News - {symbol}</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold text-gray-900">Latest News - {symbol}</h2>
+        <div className="flex items-center gap-2">
+          {isUpdating && (
+            <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+          )}
+          <span className="text-xs text-gray-500">
+            Refreshes every 5 min • Last: {new Date(lastUpdate).toLocaleTimeString()}
+          </span>
+        </div>
+      </div>
       
       <div className="space-y-4">
         {news.map((article) => {
